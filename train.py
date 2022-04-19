@@ -1,5 +1,6 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 import tensorflow_addons as tfa
 import keras_tuner as kt
@@ -66,6 +67,7 @@ def hyperparameter_tuning(
 
     return model, tuner
 
+
 def train():
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
@@ -75,6 +77,13 @@ def train():
     num_epochs = 30
     batch_size = 64
 
-    history = model.fit(padded_training,labels_for_training, epochs=num_epochs, batch_size=batch_size,verbose=1, callbacks=callbacks)
-    
+    history = model.fit(
+        padded_training,
+        labels_for_training,
+        epochs=num_epochs,
+        batch_size=batch_size,
+        verbose=1,
+        callbacks=callbacks,
+    )
+
     return model
