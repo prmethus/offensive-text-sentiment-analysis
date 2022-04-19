@@ -1,6 +1,9 @@
 # Downloading the datasets
-def download_dataset():
-    import os, requests, zipfile
+def download_and_join_datasets():
+    
+    import os, requests, zipfile, glob
+    import pandas as pd
+    
     datasets_zip = "cyberbullying_dataset-mendeley_data.zip"
     datasets_dir = "cyberbully_datasets/"
     datasets_url = "https://md-datasets-cache-zipfiles-prod.s3.eu-west-1.amazonaws.com/jf4pzyvnpj-1.zip"
@@ -19,6 +22,16 @@ def download_dataset():
         with zipfile.ZipFile(datasets_zip) as zf:
             zf.extractall(datasets_dir)
             print("The Dataset has been extracted!")
+    if not os.path.exists(os.path.join(datasets_dir, "Cyberbully_dataset_combined.csv")):
+        print("Joining the datasets together...")
+        datasets = glob.glob(os.path.join(datasets_dir, "*.csv"))
+        dataframe = pd.concat(list(map(lambda dataset: pd.read_csv(dataset)[["Text", "oh_label"]], datasets)),axis=0)    
+        dataframe = dataframe.rename(columns={"oh_label":"Offensive"})
+        print("Dataset Joined Successfully. Saving it...")
+        dataframe.to_csv(os.path.join(datasets_dir, "Cyberbully_dataset_combined.csv"), index=False)
+        print(r"Saved 'Cyberbully_dataset_combined.csv'. The dataset is also availabe on Kaggle: https://www.kaggle.com/datasets/prmethus/mendeleys-cyberbully-datasets-combined?select=Cyberbully_dataset_combined.csv")
+        
+    print(f"\nDataset path: {os.path.join(datasets_dir, 'Cyberbully_dataset_combined.csv')}")
 
             
 # Defining a function for tokenizin and padding words in a sentence
@@ -29,19 +42,24 @@ def tokenize_and_pad(texts, tokenizer, maxlen=100, padding='post', truncating='p
     
     return padded_sequences
 
-def stratified_sampling_train_test_validation(sentences, labels):
-    
+
+def stratified_split(dataset):
+        
     from sklearn.model_selection import StratifiedShuffleSplit
     
-    s1 = StratifiedShuffleSplit(n_splits=2, test_size=0.2, random_state=0)
-    s2 = StratifiedShuffleSplit(n_splits=2, test_size=0.5, random_state=0)
+    dataset = dataset.reset_index() # Required for Stratified Split.
     
-    for train_index, test_valid_index in s1.split(sentences, labels):
-        sentences_for_training, labels_for_training = sentences[train_index], labels[train_index]
-        sentences_for_testing_valid, labels_for_testing_valid = sentences[test_valid_index], labels[test_valid_index]
+    split1 = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
+    split2 = StratifiedShuffleSplit(n_splits=1, test_size=0.5, random_state=0)
+    
+    for train_set_index, validation_test_set_index in split1.split(dataset["Text"], dataset["Offensive"]):
+        train_set = dataset.loc[train_set_index,["Text", "Offensive"]]
+        validation_test_set = dataset.loc[validation_test_set_index,["Text", "Offensive"]]
+    
+    validation_test_set = validation_test_set.reset_index()
+    
+    for validation_set_index, test_set_index in split2.split(validation_test_set["Text"], validation_test_set["Offensive"]):
+        validation_set = validation_test_set.loc[validation_set_index,["Text", "Offensive"]]
+        test_set = validation_test_set.loc[test_set_index,["Text", "Offensive"]]
         
-    for validation_index, test_index in s2.split(sentences_for_testing_valid, labels_for_testing_valid):
-        sentences_for_validation, labels_for_validation = sentences_for_testing_valid[validation_index], labels[validation_index]
-        sentences_for_testing, labels_for_testing = sentences_for_testing_valid[test_index], labels[test_index]
-        
-        return (sentences_for_training, labels_for_training), (sentences_for_validation, labels_for_validation), (sentences_for_testing, labels_for_testing)
+    return train_set, validation_set, test_set
